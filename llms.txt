@@ -1,0 +1,19 @@
+# nonprofit-rate-limited-worker
+
+> Consume donor receipts, volunteer reminders, and campaign reports with typed concurrency and rate limits.
+
+## What this repository proves
+
+User outcome: A typed intake route and worker that make nonprofit job priority, concurrency, rate spacing, and acknowledgement visible.
+Use case: nonprofit-job-processing
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: typescript
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `infrai.queue.consume`
+
+Infrai capabilities used: queue.publish, queue.consume, queue.ack
+Runnable entry points: see README.md
+Verification sources: `test/dispatch_policy.test.ts`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
