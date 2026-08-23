@@ -8,7 +8,7 @@ export INFRAI_API_KEY=your_key_here
 npm run dev
 ```
 
-In another terminal, fire off a donor receipt:
+In a second terminal, push a donor receipt:
 
 ```bash
 curl -X POST http://localhost:3000/jobs \
@@ -32,24 +32,24 @@ WORKER_CONCURRENCY=3 JOBS_PER_SECOND=2 npm run worker
 
 This queue carries three jobs that tend to show up behind one storefront-style action: a donor wants a receipt, a volunteer needs a shift reminder in time, and the campaign team wants a report. `planDispatch` makes that business order explicit. Receipts and reminders for shifts inside 24 hours are urgent, later reminders are normal, and reports go to the background.
 
-The worker pulls up to `WORKER_CONCURRENCY` messages at once, sorts each batch by that decision, and spaces the starts using `JOBS_PER_SECOND`. A job is only acked after its concrete action finishes. The output stays observable and tied to the domain:
+The worker pulls up to `WORKER_CONCURRENCY` messages at once, sorts each batch by that decision, and spaces the starts using `JOBS_PER_SECOND`. It only acks a job after the concrete action actually finishes. The output stays observable and tied to the domain:
 
 ```json
 {"jobId":"donation-1042","result":"receipt sent to lee@example.org for 7500 cents","acknowledged":true}
 ```
 
-One real gotcha is timing. `VISIBILITY_TIMEOUT` has to comfortably beat the slowest batch, rate-limit spacing included. The default here is 60 seconds; set it from measured receipt, reminder, and report durations when you adapt the worker.
+One real gotcha is timing: `VISIBILITY_TIMEOUT` has to comfortably beat the slowest batch, rate-limit spacing included. The default here is 60 seconds. When you adapt the worker, set it from measured receipt, reminder, and report durations.
 
 ## Check the decision before running a queue
 
-The focused test hands in a reminder whose shift starts in 23 hours and a closed-period campaign report. It expects the reminder to be `urgent` with `send_reminder`, and the report to be `background` with `compile_report`.
+The focused test feeds a reminder whose shift starts in 23 hours plus a completed-period campaign report. It expects the reminder to be `urgent` with `send_reminder`, and the report to be `background` with `compile_report`.
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-There's no queue SDK buried in the example. `src/infrai_queue.ts` uses plain REST, decodes the response envelope before deciding status, retries HTTP 429 with exponential backoff or `Retry-After`, and stamps a stable idempotency key onto publish and ack writes. That keeps the copy-paste part small while the app files stay about nonprofit work.
+There's no queue SDK hiding in the example. `src/infrai_queue.ts` uses plain REST, decodes the response envelope before deciding status, retries HTTP 429 with exponential delay or `Retry-After`, and stamps a stable idempotency key on publish and ack writes. That keeps the copy-paste part small while the app files stay about nonprofit work.
 
 ## Repository map
 
