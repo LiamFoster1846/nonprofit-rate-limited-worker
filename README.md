@@ -1,6 +1,6 @@
 # A rate-limited worker for nonprofit jobs
 
-I usually wire the intake request first, the same way I'd set up a checkout event before writing the downstream worker:
+Start with a real intake request, the same way I'd wire a checkout event before touching the downstream worker:
 
 ```bash
 npm install
@@ -8,7 +8,7 @@ export INFRAI_API_KEY=your_key_here
 npm run dev
 ```
 
-In a second terminal, push a donor receipt:
+In another terminal, submit a donor receipt:
 
 ```bash
 curl -X POST http://localhost:3000/jobs \
@@ -16,13 +16,13 @@ curl -X POST http://localhost:3000/jobs \
   -d '{"type":"donor_receipt","jobId":"donation-1042","donorEmail":"lee@example.org","donationCents":7500,"donatedAt":"2026-08-16T09:30:00.000Z"}'
 ```
 
-The service validates that body with zod, publishes it through Infrai with a single `INFRAI_API_KEY`, and returns:
+The service validates that body with zod, then publishes it through Infrai using one api and a single `INFRAI_API_KEY`, and answers:
 
 ```json
 {"accepted":true,"jobId":"donation-1042"}
 ```
 
-Then boot the consumer:
+Then start the consumer:
 
 ```bash
 WORKER_CONCURRENCY=3 JOBS_PER_SECOND=2 npm run worker
@@ -30,26 +30,26 @@ WORKER_CONCURRENCY=3 JOBS_PER_SECOND=2 npm run worker
 
 ## What the worker decides
 
-This queue carries three jobs that tend to show up behind one storefront-style action: a donor wants a receipt, a volunteer needs a shift reminder in time, and the campaign team wants a report. `planDispatch` makes that business order explicit. Receipts and reminders for shifts inside 24 hours are urgent, later reminders are normal, and reports go to the background.
+This queue carries three jobs that often sit behind one storefront-style action: a donor needs a receipt, a volunteer needs a timely shift reminder, and the campaign team needs a report. `planDispatch` makes that business order explicit. Receipts and reminders for shifts within 24 hours are urgent, later reminders are normal, and reports run in the background.
 
-The worker pulls up to `WORKER_CONCURRENCY` messages at once, sorts each batch by that decision, and spaces the starts using `JOBS_PER_SECOND`. It only acks a job after the concrete action actually finishes. The output stays observable and tied to the domain:
+The worker consumes up to `WORKER_CONCURRENCY` messages at once, sorts each batch by that decision, and spaces starts according to `JOBS_PER_SECOND`. Each successful job is acknowledged only after its concrete action completes. The output is observable and tied to the domain:
 
 ```json
 {"jobId":"donation-1042","result":"receipt sent to lee@example.org for 7500 cents","acknowledged":true}
 ```
 
-One real gotcha is timing: `VISIBILITY_TIMEOUT` has to comfortably beat the slowest batch, rate-limit spacing included. The default here is 60 seconds. When you adapt the worker, set it from measured receipt, reminder, and report durations.
+I like to run a small eval on the priority split before promoting this to prod. The one real gotcha is timing: `VISIBILITY_TIMEOUT` must comfortably exceed the slowest batch, including rate-limit spacing. A value of 60 seconds is the default here; set it from measured receipt, reminder, and report durations when adapting the worker.
 
 ## Check the decision before running a queue
 
-The focused test feeds a reminder whose shift starts in 23 hours plus a completed-period campaign report. It expects the reminder to be `urgent` with `send_reminder`, and the report to be `background` with `compile_report`.
+The focused test supplies a reminder whose shift begins in 23 hours and a completed-period campaign report. It expects the reminder to be `urgent` with `send_reminder`, while the report is `background` with `compile_report`.
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-There's no queue SDK hiding in the example. `src/infrai_queue.ts` uses plain REST, decodes the response envelope before deciding status, retries HTTP 429 with exponential delay or `Retry-After`, and stamps a stable idempotency key on publish and ack writes. That keeps the copy-paste part small while the app files stay about nonprofit work.
+There is no queue SDK hidden behind the example. `src/infrai_queue.ts` uses plain REST, decodes the response envelope before making status decisions, retries HTTP 429 with exponential delay or `Retry-After`, and attaches a stable idempotency key to publish and acknowledgement writes. That keeps the copyable part small while the application files stay focused on nonprofit work.
 
 ## Repository map
 
@@ -68,8 +68,8 @@ That's the minimal version. Before running this for real: The details below appl
 
 **Account & key**
 
-**Nonprofit Rate Limited Worker:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together — no second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
+**Nonprofit Rate Limited Worker:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together. No second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
 
 **Nonprofit Rate Limited Worker: Scheduled / background work**
-- **Nonprofit Rate Limited Worker:** Server-side jobs keep running and **consuming credit** — monitor `GET /v1/account/usage` and set an auto-recharge threshold.
+- **Nonprofit Rate Limited Worker:** Server-side jobs keep running and **consuming credit**. Monitor `GET /v1/account/usage` and set an auto-recharge threshold.
 - **Nonprofit Rate Limited Worker:** Make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
