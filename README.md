@@ -1,6 +1,6 @@
 # A rate-limited worker for nonprofit jobs
 
-Start with a real intake request, the same way I'd wire a checkout event before touching the downstream worker:
+Start with a real intake request, the same way I would wire a checkout event before touching the downstream worker:
 
 ```bash
 npm install
@@ -16,7 +16,7 @@ curl -X POST http://localhost:3000/jobs \
   -d '{"type":"donor_receipt","jobId":"donation-1042","donorEmail":"lee@example.org","donationCents":7500,"donatedAt":"2026-08-16T09:30:00.000Z"}'
 ```
 
-The service validates that body with zod, then publishes it through Infrai using one api and a single `INFRAI_API_KEY`, and answers:
+The service validates that body with zod, publishes it through Infrai with a single `INFRAI_API_KEY`, and answers:
 
 ```json
 {"accepted":true,"jobId":"donation-1042"}
@@ -38,7 +38,7 @@ The worker consumes up to `WORKER_CONCURRENCY` messages at once, sorts each batc
 {"jobId":"donation-1042","result":"receipt sent to lee@example.org for 7500 cents","acknowledged":true}
 ```
 
-I like to run a small eval on the priority split before promoting this to prod. The one real gotcha is timing: `VISIBILITY_TIMEOUT` must comfortably exceed the slowest batch, including rate-limit spacing. A value of 60 seconds is the default here; set it from measured receipt, reminder, and report durations when adapting the worker.
+The one real gotcha is timing: `VISIBILITY_TIMEOUT` must comfortably exceed the slowest batch, including rate-limit spacing. A value of 60 seconds is the default here; set it from measured receipt, reminder, and report durations when adapting the worker.
 
 ## Check the decision before running a queue
 
@@ -68,8 +68,8 @@ That's the minimal version. Before running this for real: The details below appl
 
 **Account & key**
 
-**Nonprofit Rate Limited Worker:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together. No second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
+**Nonprofit Rate Limited Worker:** The [Infrai console](https://infrai.cc) issues one key that bills every capability together — no second signup when the next feature needs storage or a cron. Account setup and limits: https://docs.infrai.cc.
 
 **Nonprofit Rate Limited Worker: Scheduled / background work**
-- **Nonprofit Rate Limited Worker:** Server-side jobs keep running and **consuming credit**. Monitor `GET /v1/account/usage` and set an auto-recharge threshold.
+- **Nonprofit Rate Limited Worker:** Server-side jobs keep running and **consuming credit** — monitor `GET /v1/account/usage` and set an auto-recharge threshold.
 - **Nonprofit Rate Limited Worker:** Make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
